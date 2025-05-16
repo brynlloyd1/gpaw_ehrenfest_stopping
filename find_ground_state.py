@@ -84,7 +84,7 @@ for i in range(n_c[0]):
             if dist < rcut:
                 vext.vext_g[i, j, k] += A * np.exp(-dist**2)
 
-    system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(5), external=vext, txt=name + '_vext_gs.txt')
+system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(5), external=vext, txt=name + '_vext_gs.txt')
 
-    system.get_potential_energy()
-    system.calc.write(name + '.gpw', mode='all')
+system.get_potential_energy()
+system.calc.write(name + '.gpw', mode='all')
