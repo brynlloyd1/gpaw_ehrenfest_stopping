@@ -20,7 +20,7 @@ filename_body = f"{name}_{str(kinetic_energy*1e-3):0f}k"
 
 
 # will need to add parallel argument to get parallelisation to work
-td_calc = TDDFT(filename=f"{name}_ground_state.gpw",   # file containing the ground state from which to propagate
+td_calc = TDDFT(filename=name + "_ground_state.gpw",   # file containing the ground state from which to propagate
                 propagator="EFSICN",                   # time propagator for the Kohn-Sham equations - need this one for ehrenfest
                 solver="BiCGStab",                     # solver for the propagator
                 text="output.txt")
@@ -50,6 +50,6 @@ save_every = 10
 evv = EhrenfestVelocityVerlet(td_calc)
 for i in range(niters):
     if i != 0 and i % save_every == 0:
-        td_calc.write(f"{filename_body}_step{i}.gpw")
+        td_calc.write(filename_body + "_step" + i + ".gpw")
 
     evv.propagate(timestep)

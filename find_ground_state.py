@@ -50,7 +50,7 @@ calc = GPAW(mode='fd',
             nbands=110,
             xc='LDA',
             charge=1,
-            txt=name + 'ground_state.txt',
+            txt=f"{name}_ground_state.txt",
             convergence=conv_fast,
             external=constant_potential,
             symmetry={'point_group': False})
@@ -84,7 +84,7 @@ for i in range(n_c[0]):
             if dist < rcut:
                 vext.vext_g[i, j, k] += A * np.exp(-dist**2)
 
-system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(5), external=vext, txt=name + '_vext_gs.txt')
+system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(5), external=vext, txt=f"{name}_vext_gs.txt")
 
 system.get_potential_energy()
 system.calc.write(name + '.gpw', mode='all')
