@@ -50,7 +50,7 @@ calc = GPAW(mode='fd',
             nbands=110,
             xc='LDA',
             charge=1,
-            txt=f"{name}_ground_state.txt",
+            txt=f"{name}_ground_state.",
             convergence=conv_fast,
             external=constant_potential,
             symmetry={'point_group': False})
