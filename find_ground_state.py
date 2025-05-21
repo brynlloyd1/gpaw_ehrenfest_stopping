@@ -27,7 +27,7 @@ projectile = Atoms("H",
                    cell=al_supercell.cell,
                    positions=[projectile_starting_position])
 
-system = al_supercell + projectile
+system = al_supercell  # + projectile
 # PREVIOUSLY HAD PBC'S ON (IN ALL THREE DIRECTIONS?? WHICH DOESNT MAKE SENSE BC I ADD VACUUM TO THE END...)
 # system.set_pbc(True)
 
@@ -59,6 +59,12 @@ calc = GPAW(mode='fd',
 system.calc = calc
 system.get_potential_energy()
 
+print("""
+
+FIRST CALCULATION FINISHED!!
+
+""")
+
 
 # second ground state calculation with par?? convergence
 
@@ -84,7 +90,15 @@ for i in range(n_c[0]):
             if dist < rcut:
                 vext.vext_g[i, j, k] += A * np.exp(-dist**2)
 
-system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(5), external=vext, txt=f"{name}_vext_gs.txt")
+system.calc = calc.new(convergence=conv_par, eigensolver=RMMDIIS(
+    5), external=vext, txt=f"{name}_vext_gs.txt")
 
 system.get_potential_energy()
+
+print("""
+
+FIRST CALCULATION FINISHED!!
+
+""")
+
 system.calc.write(name + '.gpw', mode='all')
