@@ -2,3 +2,5 @@ gpaw_code/Al_stopping.gpw
 gpaw_code/*.txt
 stopping_analysis/*.xyz
 stopping_analysis/*.txt
+data/*
+env/*
