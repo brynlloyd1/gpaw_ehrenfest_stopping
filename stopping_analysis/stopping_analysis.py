@@ -117,6 +117,13 @@ class StoppingPowerAnalysis:
         return projectile_positions
 
     def plot_kinetic_energies(self):
+        """
+        plots projectile kinetic energy over the projectile trajectory
+        performs a sliding window straight line fit (r^2 minimisation) to fit
+        a straight line to the region where the projectile passes through the supercell
+        extracts stopping power from this fit
+        """
+
         n_subplots = len(self.kinetic_energies.keys())
         fig, axs = plt.subplots(n_subplots, figsize=(
             10, 5*n_subplots), sharex=True)
@@ -158,38 +165,3 @@ class StoppingPowerAnalysis:
 
         _ = [ax.legend() for ax in axs]
         plt.show()
-
-    # def plot_kinetic_energies(self):
-    #     """
-    #     extract kinetic energy from the atoms instances stored inside self.atoms_dict[energy]
-    #     then plot, with a subplots for each energy
-    #     """
-    #
-    #     n_subplots = len(self.kinetic_energies.keys())
-    #     fig, axs = plt.subplots(n_subplots, figsize=(10, 5*n_subplots))
-    #     # TODO: add title and axis labels
-    #     # TODO: add fitting to extract stopping powers - might be hard to account for different sizes of supercells
-    #
-    #     # so that is works for the =1 case
-    #     if n_subplots == 1:
-    #         axs = [axs]
-    #
-    #     for i in range(n_subplots):
-    #         energy, kinetic_energies = list(self.kinetic_energies.items())[i]
-    #         _, projectile_positions = list(
-    #             self.projectile_positions.items())[i]
-    #
-    #         print(projectile_positions, kinetic_energies)
-    #
-    #         axs[i].plot(projectile_positions, kinetic_energies)
-    #
-    #     plt.show()
-
-
-if __name__ == "__main__":
-
-    # data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/small_unitcell/"
-    data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/larger_unitcell/"
-
-    analysis = StoppingPowerAnalysis(data_directory)
-    analysis.plot_kinetic_energies()
