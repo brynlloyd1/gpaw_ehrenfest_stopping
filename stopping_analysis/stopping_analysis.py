@@ -4,6 +4,8 @@ from ase.io import write
 
 import numpy as np
 import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.widgets import Slider
 
 import utils
 
@@ -13,11 +15,15 @@ import json
 
 
 class StoppingPowerAnalysis:
-    def __init__(self, data_directory, energy=40):
+    def __init__(self, data_directory):
 
         # get dictionary of filenames
+        if not data_directory.endswith("/"):
+            data_directory += "/"
         self.data_directory = data_directory
-        self.filenames = self.extract_gpaw_files()
+        all_gpw_files, self.filenames = self.extract_gpaw_files()
+
+        print(self.data_directory)
         print(json.dumps(self.filenames, indent=4))
 
         # TODO: if theres multiple energies, and you write for each of them
@@ -25,6 +31,7 @@ class StoppingPowerAnalysis:
         self.trajectory_file = "output.xyz"
 
         self.atoms_dict = {}
+        self.calc_dict = {}
         for energy in self.filenames.keys():
             self.load_data(energy)
 
@@ -77,7 +84,7 @@ class StoppingPowerAnalysis:
         filenames = {f"{key} keV": value for key,
                      value in filenames_temp.items()}
 
-        return filenames
+        return all_gpw_files, filenames
 
     def load_data(self, energy):
         """
@@ -89,6 +96,9 @@ class StoppingPowerAnalysis:
             atoms, calc = restart(self.data_directory + filename)
             self.atoms_dict = utils.append_to_dict(
                 self.atoms_dict, energy, atoms)
+
+            self.calc_dict = utils.append_to_dict(
+                self.calc_dict, energy, calc)
 
     def write_data(self, energy):
         """
@@ -165,3 +175,73 @@ class StoppingPowerAnalysis:
 
         _ = [ax.legend() for ax in axs]
         plt.show()
+
+    def visualise_electron_density(self, energy, timestep):
+        """
+        produces an interactive 3D plot of electron density
+        """
+
+        timestep_index = int(timestep / 10 - 1)
+        atoms = self.atoms_dict[energy][timestep_index]
+
+        print(f"""
+
+        DEBUG: number of atoms: {len(atoms)}
+
+        """)
+
+        calc = self.calc_dict[energy][timestep_index]
+        electron_density = calc.get_all_electron_density()
+        atom_positions = atoms.get_positions()
+        lattice_positions = atom_positions[:-1]
+        projectile_positions = atom_positions[-1]
+
+        # setup density slice things
+        nx, ny, nz = np.shape(electron_density)
+        xx, yy = np.meshgrid(np.linspace(0, 1, nz), np.linspace(0, 1, ny))
+        X = xx
+        Y = yy
+
+        # setup plotting atom position things
+        # want to normalise atom positions to unit cube using atoms.get_cell()
+        cell_size = atoms.get_cell()
+        fcc_xs = lattice_positions[:, 0] / (cell_size[0, 0])
+        fcc_ys = lattice_positions[:, 1] / (cell_size[1, 1])
+        fcc_zs = lattice_positions[:, 2] / (cell_size[2, 2])
+
+        proton_xs = projectile_positions[0] / (cell_size[0, 0])
+        proton_ys = projectile_positions[1] / (cell_size[1, 1])
+        proton_zs = projectile_positions[2] / (cell_size[2, 2])
+
+        fig = plt.figure(figsize=(20, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_zlim((0, 1))
+
+        # Create the slider
+        ax_slider = plt.axes([0.15, 0.02, 0.7, 0.03],
+                             facecolor='lightgoldenrodyellow')
+        slice_location = 0
+        slider = Slider(ax_slider, 'Frame', 0, nx - 1,
+                        valinit=slice_location, valstep=1)
+
+        vmax = np.log10(np.max(electron_density))
+        vmin = vmax - 8
+
+        def animate(f):
+            ax.clear()
+            slice = electron_density[f, :, :]
+            ax.contourf(X, Y, np.log10(slice), zdir='z',
+                        offset=f/nx, cmap="jet", vmax=vmax)
+            ax.scatter(fcc_ys, fcc_zs, fcc_xs, s=500, alpha=1)
+            ax.scatter(proton_ys, proton_zs, proton_xs, s=300, alpha=1)
+            ax.set_zlim((0, 1))
+
+        # dont need to call FuncAnimation when you have the slider going
+        slider.on_changed(animate)
+        plt.show()
+
+
+if __name__ == "__main__":
+    data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/larger_unitcell"
+    analysis = StoppingPowerAnalysis(data_directory)
+    analysis.visualise_electron_density("40 keV", 40)
