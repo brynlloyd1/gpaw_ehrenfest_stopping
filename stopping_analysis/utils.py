@@ -27,6 +27,17 @@ def calculate_r2(x, y, y_fit):
 
 
 def sliding_fit(x, y, min_window_size, max_window_size=None):
+    """
+    find the best straight line fit
+    uses a sliding window and R^2 value to find optimum fit
+
+    Parameters:
+    x (np.ndarray): x values
+    y (np.ndarray): y values
+    min_window_size (int): minimum number of points to be included in straight line fit
+    max_window_size (int): maximum number of points to be included in fit
+    """
+
     if max_window_size is None:
         max_window_size = len(x)
 

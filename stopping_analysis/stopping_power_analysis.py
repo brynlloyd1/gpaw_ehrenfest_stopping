@@ -72,17 +72,15 @@ class StoppingPowerAnalysis:
                 timesteps_temp, energy, timestep)
 
         # sort files in ascending order according to the timestep
-        # yes ik its sorting strings numerically but it works so idc
         for energy in filenames_temp.keys():
             paired = sorted(
-                zip(timesteps_temp[energy], filenames_temp[energy]))
+                zip(map(int, timesteps_temp[energy]), filenames_temp[energy]))
 
             _, filenames_sorted = zip(*paired)
             filenames_temp[energy] = list(filenames_sorted)
 
         # rename keys
-        filenames = {f"{key} keV": value for key,
-                     value in filenames_temp.items()}
+        filenames = {f"{key} keV": value for key, value in filenames_temp.items()}
 
         return all_gpw_files, filenames
 
@@ -94,11 +92,9 @@ class StoppingPowerAnalysis:
 
         for filename in self.filenames[energy]:
             atoms, calc = restart(self.data_directory + filename)
-            self.atoms_dict = utils.append_to_dict(
-                self.atoms_dict, energy, atoms)
+            self.atoms_dict = utils.append_to_dict(self.atoms_dict, energy, atoms)
 
-            self.calc_dict = utils.append_to_dict(
-                self.calc_dict, energy, calc)
+            self.calc_dict = utils.append_to_dict(self.calc_dict, energy, calc)
 
     def write_data(self, energy):
         """
@@ -135,8 +131,7 @@ class StoppingPowerAnalysis:
         """
 
         n_subplots = len(self.kinetic_energies.keys())
-        fig, axs = plt.subplots(n_subplots, figsize=(
-            10, 5*n_subplots), sharex=True)
+        fig, axs = plt.subplots(n_subplots, figsize=(10, 5*n_subplots), sharex=True)
         # so that is works for the =1 case
         if n_subplots == 1:
             axs = [axs]
@@ -159,8 +154,7 @@ class StoppingPowerAnalysis:
             ##################################
 
             # TODO: should be able to calculat the minimum window size from the size of the unit cell and from the distance travelled per timestep
-            fit, cov, x_window, y_window = utils.sliding_fit(
-                projectile_positions, kinetic_energies, 3, 5)
+            fit, cov, x_window, y_window = utils.sliding_fit(projectile_positions, kinetic_energies, 3, 5)
             stopping_power = -fit[0]
             stopping_power_uncertainty = np.sqrt(cov[0][0])
 
@@ -170,8 +164,17 @@ class StoppingPowerAnalysis:
             axs[i].plot(x_window, np.poly1d(fit)(x_window), color="red",
                         label=rf"$S_e$ = {1e3*stopping_power:.1f} $\pm$ {1e3*stopping_power_uncertainty:.1f} [eV/$\AA$]")
 
-        print(projectile_positions)
-        print(kinetic_energies)
+            ############################################
+            # SHOWING ON THE PLOT WHERE THE LATTICE IS #
+            ############################################
+
+            # can get atom positions from any of the timesteps becuase lattice positions dont change
+            # [0] -> first timestep, [:-1] -> exclude the projectile
+            lattice_positions = self.atoms_dict[energy][0].get_positions()[:-1]
+            lattice_start = min(lattice_positions[:, 0])
+            lattice_end = max(lattice_positions[:, 0])
+            axs[i].axvspan(lattice_start, lattice_end,
+                           color="yellow", alpha=0.25, label="nuclei positions")
 
         _ = [ax.legend() for ax in axs]
         plt.show()
@@ -230,8 +233,7 @@ class StoppingPowerAnalysis:
         def animate(f):
             ax.clear()
             slice = electron_density[f, :, :]
-            ax.contourf(X, Y, np.log10(slice), zdir='z',
-                        offset=f/nx, cmap="jet", vmax=vmax)
+            ax.contourf(X, Y, np.log10(slice), zdir='z',offset=f/nx, cmap="jet", vmax=vmax)
             ax.scatter(fcc_ys, fcc_zs, fcc_xs, s=500, alpha=1)
             ax.scatter(proton_ys, proton_zs, proton_xs, s=300, alpha=1)
             ax.set_zlim((0, 1))
@@ -244,4 +246,4 @@ class StoppingPowerAnalysis:
 if __name__ == "__main__":
     data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/larger_unitcell"
     analysis = StoppingPowerAnalysis(data_directory)
-    analysis.visualise_electron_density("40 keV", 40)
+    # analysis.visualise_electron_density("40 keV", 40)
