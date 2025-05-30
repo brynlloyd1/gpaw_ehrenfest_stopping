@@ -1,14 +1,10 @@
 from gpaw import restart
 
-from ase.io import write
-
 import numpy as np
 import matplotlib.pyplot as plt
-# from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.widgets import Slider
+from matplotlib.widgets import Slider, CheckButtons
 
 import utils
-
 import os
 import re
 import json
@@ -18,27 +14,16 @@ class StoppingPowerAnalysis:
     def __init__(self, data_directory):
 
         # get dictionary of filenames
-        if not data_directory.endswith("/"):
-            data_directory += "/"
+        if not data_directory.endswith("/"): data_directory += "/"
         self.data_directory = data_directory
-        all_gpw_files, self.filenames = self.extract_gpaw_files()
-
+        self.filenames = self.extract_gpaw_files()
         print(self.data_directory)
         print(json.dumps(self.filenames, indent=4))
-
-        # TODO: if theres multiple energies, and you write for each of them
-        # TODO: atm it just overwrites the same file multiple times
-        self.trajectory_file = "output.xyz"
 
         self.atoms_dict = {}
         self.calc_dict = {}
         for energy in self.filenames.keys():
             self.load_data(energy)
-
-        write = True
-        if write:
-            energy_to_write = "40 keV"
-            self.write_data(energy_to_write)
 
         self.kinetic_energies = self.get_projectile_kinetic_energies()
         self.projectile_positions = self.get_projectile_positions()
@@ -66,23 +51,18 @@ class StoppingPowerAnalysis:
                 continue
             energy, timestep = match.group(1), match.group(2)
 
-            filenames_temp = utils.append_to_dict(
-                filenames_temp, energy, filename)
-            timesteps_temp = utils.append_to_dict(
-                timesteps_temp, energy, timestep)
+            filenames_temp = utils.append_to_dict(filenames_temp, energy, filename)
+            timesteps_temp = utils.append_to_dict(timesteps_temp, energy, timestep)
 
         # sort files in ascending order according to the timestep
         for energy in filenames_temp.keys():
-            paired = sorted(
-                zip(map(int, timesteps_temp[energy]), filenames_temp[energy]))
-
+            paired = sorted(zip(map(int, timesteps_temp[energy]), filenames_temp[energy]))
             _, filenames_sorted = zip(*paired)
             filenames_temp[energy] = list(filenames_sorted)
 
         # rename keys
         filenames = {f"{key} keV": value for key, value in filenames_temp.items()}
-
-        return all_gpw_files, filenames
+        return filenames
 
     def load_data(self, energy):
         """
@@ -93,7 +73,6 @@ class StoppingPowerAnalysis:
         for filename in self.filenames[energy]:
             atoms, calc = restart(self.data_directory + filename)
             self.atoms_dict = utils.append_to_dict(self.atoms_dict, energy, atoms)
-
             self.calc_dict = utils.append_to_dict(self.calc_dict, energy, calc)
 
     def write_data(self, energy):
@@ -122,128 +101,171 @@ class StoppingPowerAnalysis:
                                 for energy, atoms_list in self.atoms_dict.items()}
         return projectile_positions
 
-    def plot_kinetic_energies(self):
+
+    def plot_stopping_data(self):
         """
-        plots projectile kinetic energy over the projectile trajectory
-        performs a sliding window straight line fit (r^2 minimisation) to fit
-        a straight line to the region where the projectile passes through the supercell
-        extracts stopping power from this fit
+        for every projectile energy, creates 2 plots
+        1. projectile kinetic energy against distance travelled
+        2. gradient of kinetic energy against distance travelled
+
+        TODO: want to extract stopping powers
         """
+        #################
+        # CREATE FIGURE #
+        #################
 
         n_subplots = len(self.kinetic_energies.keys())
-        fig, axs = plt.subplots(n_subplots, figsize=(10, 5*n_subplots), sharex=True)
-        # so that is works for the =1 case
+        fig,axs = plt.subplots(n_subplots, 2, figsize=(15, 5*n_subplots), sharex="col")
         if n_subplots == 1:
-            axs = [axs]
+            print(1)
+            axs = np.array([axs])
 
-        fig.suptitle("Fitting KE to extract stopping powers")
+        fig.suptitle("Stopping Power Things")
+        _ = [ax.set_ylabel("Kinetic Energy [keV]") for ax in axs[:,0]]
+        _ = [ax.set_ylabel(r"$\frac{dKE}{dx}$ [keV/$\AA$]") for ax in axs[:,1]]
+        _ = [ax.set_xlabel(r"Projectile Position [$\AA$]") for ax in axs[n_subplots-1]]
 
-        axs[-1].set_xlabel(r"projectile position [$\AA$]")
-        _ = [ax.set_ylabel("kinetic energy [keV]") for ax in axs]
+        #######################################
+        # ITERATE OVER EACH PROJECTILE ENERGY #
+        #######################################
 
         for i in range(n_subplots):
+
+            # get raw data
             energy, kinetic_energies = list(self.kinetic_energies.items())[i]
-            kinetic_energies = np.array(
-                kinetic_energies) * 1e-3  # convert from eV to keV
-            _, projectile_positions = list(
-                self.projectile_positions.items())[i]
+            kinetic_energies = np.array(kinetic_energies) * 1e-3  # convert from eV to keV
+            _, projectile_positions = list(self.projectile_positions.items())[i]
 
-            ##################################
-            # PERFORM SLIDING WINDOW FITTING #
-            #     and get stopping power
-            ##################################
-
-            # TODO: should be able to calculat the minimum window size from the size of the unit cell and from the distance travelled per timestep
-            fit, cov, x_window, y_window = utils.sliding_fit(projectile_positions, kinetic_energies, 3, 5)
-            stopping_power = -fit[0]
-            stopping_power_uncertainty = np.sqrt(cov[0][0])
-
-            axs[i].set_title(f"Projectile Initial energy: {energy}")
-            axs[i].plot(projectile_positions, kinetic_energies, "x")
-            axs[i].plot(x_window, y_window, "x", color="red")
-            axs[i].plot(x_window, np.poly1d(fit)(x_window), color="red",
-                        label=rf"$S_e$ = {1e3*stopping_power:.1f} $\pm$ {1e3*stopping_power_uncertainty:.1f} [eV/$\AA$]")
-
-            ############################################
-            # SHOWING ON THE PLOT WHERE THE LATTICE IS #
-            ############################################
-
-            # can get atom positions from any of the timesteps becuase lattice positions dont change
-            # [0] -> first timestep, [:-1] -> exclude the projectile
+            # get lattice positions, and highlight region where there are nuclei
             lattice_positions = self.atoms_dict[energy][0].get_positions()[:-1]
             lattice_start = min(lattice_positions[:, 0])
             lattice_end = max(lattice_positions[:, 0])
-            axs[i].axvspan(lattice_start, lattice_end,
-                           color="yellow", alpha=0.25, label="nuclei positions")
+            _ = [ax.axvspan(lattice_start, lattice_end, color="yellow", alpha=0.25, label="nuclei positions") for ax in axs.flatten()]
 
-        _ = [ax.legend() for ax in axs]
-        plt.show()
+            # get the data specifically for when the proton is inside the supercell
+            timesteps_in_supercell = np.where((projectile_positions > lattice_start) & (projectile_positions < lattice_end))[0]
+            projectile_positions_supercell = projectile_positions[timesteps_in_supercell[0] : timesteps_in_supercell[-1]]
+            kinetic_energies_supercell = kinetic_energies[timesteps_in_supercell[0] : timesteps_in_supercell[-1]]
 
-    def visualise_electron_density(self, energy, timestep):
+            # plot kinetic energy on left plot
+            axs[i, 0].plot(projectile_positions, kinetic_energies, "x")
+            axs[i, 0].plot(projectile_positions_supercell, kinetic_energies_supercell, "x", color="red")
+
+            # plot gradient of kinetic energy on right plot
+            axs[i, 1].plot(projectile_positions[:-1], np.diff(kinetic_energies))
+            axs[i, 1].plot(projectile_positions_supercell[:-1], np.diff(kinetic_energies_supercell), "x", color="red")
+
+
+    def visualise_ehrenfest(self, energy):
         """
-        produces an interactive 3D plot of electron density
+        creates animation using matplotlib sliders to display 2d slice of electron density
+        has sliders to control slice position, timestep, vmin&vmax
+        can also toggle logarithmic plotting
         """
+        atoms_list = self.atoms_dict[energy]
+        # nuclei_positions_list = [atoms.get_positions() for atoms in atoms_list]
+        calc_list = self.calc_dict[energy]
+        electron_density_list = [calc.get_all_electron_density() for calc in calc_list]
 
-        timestep_index = int(timestep / 10 - 1)
-        atoms = self.atoms_dict[energy][timestep_index]
+        timesteps = len(atoms_list)
+        shape = np.shape(electron_density_list)
 
-        print(f"""
+        # Initial values
+        init_timestep = 0
+        init_slice = shape[1] // 2
+        use_log = False
 
-        DEBUG: number of atoms: {len(atoms)}
+        # Compute global vmin/vmax for raw and log data
+        all_data = np.stack(electron_density_list)
+        vmin_raw = all_data.min()
+        vmax_raw = all_data.max()
+        log_data = np.log10(np.clip(all_data, 1e-10, None))
+        vmin_log = log_data.min()
+        vmax_log = log_data.max()
 
-        """)
+        # Setup plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        plt.subplots_adjust(left=0.25, bottom=0.45)  # Extra room for sliders
 
-        calc = self.calc_dict[energy][timestep_index]
-        electron_density = calc.get_all_electron_density()
-        atom_positions = atoms.get_positions()
-        lattice_positions = atom_positions[:-1]
-        projectile_positions = atom_positions[-1]
+        def get_plot_data(t, slice, log=False):
+            data = electron_density_list[t][:, slice, :]
+            data = np.rot90(data)
+            if log:
+                data = np.log10(np.clip(data, 1e-10, None))
+            return data
 
-        # setup density slice things
-        nx, ny, nz = np.shape(electron_density)
-        xx, yy = np.meshgrid(np.linspace(0, 1, nz), np.linspace(0, 1, ny))
-        X = xx
-        Y = yy
+        # Initial image
+        plot_data = get_plot_data(init_timestep, init_slice, use_log)
+        im = ax.imshow(plot_data, aspect='auto', vmin=vmin_raw, vmax=vmax_raw)
+        cb = fig.colorbar(im, ax=ax)
+        title = ax.set_title(f"Timestep: {init_timestep}, Slice: {init_slice}, Log: {use_log}")
 
-        # setup plotting atom position things
-        # want to normalise atom positions to unit cube using atoms.get_cell()
-        cell_size = atoms.get_cell()
-        fcc_xs = lattice_positions[:, 0] / (cell_size[0, 0])
-        fcc_ys = lattice_positions[:, 1] / (cell_size[1, 1])
-        fcc_zs = lattice_positions[:, 2] / (cell_size[2, 2])
+        # Axes for sliders and checkbox
+        ax_timestep = plt.axes((0.25, 0.35, 0.65, 0.03))
+        ax_slice = plt.axes((0.25, 0.3, 0.65, 0.03))
+        ax_vmin = plt.axes((0.25, 0.2, 0.65, 0.03))
+        ax_vmax = plt.axes((0.25, 0.15, 0.65, 0.03))
+        ax_check = plt.axes((0.05, 0.5, 0.15, 0.1))
 
-        proton_xs = projectile_positions[0] / (cell_size[0, 0])
-        proton_ys = projectile_positions[1] / (cell_size[1, 1])
-        proton_zs = projectile_positions[2] / (cell_size[2, 2])
+        # Create sliders and checkbox
+        slider_timestep = Slider(ax_timestep, 'Timestep', 0, len(electron_density_list) - 1, valinit=init_timestep, valstep=1)
+        slider_slice = Slider(ax_slice, 'Slice', 0, shape[1] - 1, valinit=init_slice, valstep=1)
+        slider_vmin = Slider(ax_vmin, 'vmin', vmin_raw, vmax_raw, valinit=vmin_raw)
+        slider_vmax = Slider(ax_vmax, 'vmax', vmin_raw, vmax_raw, valinit=vmax_raw)
+        check = CheckButtons(ax_check, ['Log scale'], [use_log])
 
-        fig = plt.figure(figsize=(20, 10))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.set_zlim((0, 1))
+        # update called when a slider is moved
+        def update(val):
+            t = int(slider_timestep.val)
+            s = int(slider_slice.val)
+            log_flag = check.get_status()[0]
 
-        # Create the slider
-        ax_slider = plt.axes([0.15, 0.02, 0.7, 0.03],
-                             facecolor='lightgoldenrodyellow')
-        slice_location = 0
-        slider = Slider(ax_slider, 'Frame', 0, nx - 1,
-                        valinit=slice_location, valstep=1)
+            # Determine color range
+            if log_flag:
+                current_vmin = slider_vmin.val
+                current_vmax = slider_vmax.val
+            else:
+                current_vmin = slider_vmin.val
+                current_vmax = slider_vmax.val
 
-        vmax = np.log10(np.max(electron_density))
-        vmin = vmax - 8
+            # Update data
+            new_data = get_plot_data(t, s, log=log_flag)
+            im.set_data(new_data)
+            im.set_clim(vmin=current_vmin, vmax=current_vmax)
+            title.set_text(f"Timestep: {t}, Slice: {s}, Log: {log_flag}")
+            fig.canvas.draw_idle()
 
-        def animate(f):
-            ax.clear()
-            slice = electron_density[f, :, :]
-            ax.contourf(X, Y, np.log10(slice), zdir='z',offset=f/nx, cmap="jet", vmax=vmax)
-            ax.scatter(fcc_ys, fcc_zs, fcc_xs, s=500, alpha=1)
-            ax.scatter(proton_ys, proton_zs, proton_xs, s=300, alpha=1)
-            ax.set_zlim((0, 1))
+        # Log scale toggle — resets vmin/vmax sliders
+        def toggle_log(label):
+            log_flag = check.get_status()[0]
+            if log_flag:
+                slider_vmin.valmin = vmin_log
+                slider_vmin.valmax = vmax_log
+                slider_vmax.valmin = vmin_log
+                slider_vmax.valmax = vmax_log
+                slider_vmin.set_val(vmin_log)
+                slider_vmax.set_val(vmax_log)
+            else:
+                slider_vmin.valmin = vmin_raw
+                slider_vmin.valmax = vmax_raw
+                slider_vmax.valmin = vmin_raw
+                slider_vmax.valmax = vmax_raw
+                slider_vmin.set_val(vmin_raw)
+                slider_vmax.set_val(vmax_raw)
+            slider_vmin.ax.set_xlim(slider_vmin.valmin, slider_vmin.valmax)
+            slider_vmax.ax.set_xlim(slider_vmax.valmin, slider_vmax.valmax)
+            update(None)
 
-        # dont need to call FuncAnimation when you have the slider going
-        slider.on_changed(animate)
+        # runs update functions on slider movement
+        slider_timestep.on_changed(update)
+        slider_slice.on_changed(update)
+        slider_vmin.on_changed(update)
+        slider_vmax.on_changed(update)
+        check.on_clicked(toggle_log)
+
         plt.show()
-
 
 if __name__ == "__main__":
-    data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/larger_unitcell"
+    data_directory = "/Users/brynlloyd/Developer/Coding/Python/dft/gpaw/my_own_stopping/data/322_supercell"
     analysis = StoppingPowerAnalysis(data_directory)
-    # analysis.visualise_electron_density("40 keV", 40)
+    analysis.visualise_ehrenfest("40 keV")
