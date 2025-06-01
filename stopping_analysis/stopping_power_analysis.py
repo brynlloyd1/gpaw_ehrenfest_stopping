@@ -25,8 +25,9 @@ class StoppingPowerAnalysis:
         for energy in self.filenames.keys():
             self.load_data(energy)
 
-        self.kinetic_energies = self.get_projectile_kinetic_energies()
+        # projectile positions and kinetic energies at each timestep
         self.projectile_positions = self.get_projectile_positions()
+        self.kinetic_energies = self.get_projectile_kinetic_energies()
 
     def extract_gpaw_files(self):
         """
@@ -64,7 +65,7 @@ class StoppingPowerAnalysis:
         filenames = {f"{key} keV": value for key, value in filenames_temp.items()}
         return filenames
 
-    def load_data(self, energy):
+    def load_data(self, energy: str):
         """
         Parameters:
         energy (string): "__ keV"
@@ -74,20 +75,6 @@ class StoppingPowerAnalysis:
             atoms, calc = restart(self.data_directory + filename)
             self.atoms_dict = utils.append_to_dict(self.atoms_dict, energy, atoms)
             self.calc_dict = utils.append_to_dict(self.calc_dict, energy, calc)
-
-    def write_data(self, energy):
-        """
-        writes data to a .xyz file so that it can be visualised in ovito or something
-
-        Parameters:
-        energy (string): "__ keV"
-        """
-
-        if energy not in self.atoms_dict:
-            raise ValueError("nothing to write. self.atoms is an empty list")
-
-        for i, atoms in enumerate(self.atoms_dict[energy]):
-            write(self.trajectory_file, atoms, append=i > 0)
 
     def get_projectile_kinetic_energies(self):
         kinetic_energies = {energy: [atoms.get_kinetic_energy()
