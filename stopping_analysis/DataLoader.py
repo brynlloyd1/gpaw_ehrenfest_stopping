@@ -1,11 +1,10 @@
 from gpaw import restart
 
+import numpy as np
+
 import os
 import re
 import json
-
-import utils
-
 
 class DataLoader:
     def __init__(self, directory):
@@ -45,8 +44,8 @@ class DataLoader:
                 continue
             energy, timestep = match.group(1), match.group(2)
 
-            filenames_temp = utils.append_to_dict(filenames_temp, energy, filename)
-            timesteps_temp = utils.append_to_dict(timesteps_temp, energy, timestep)
+            filenames_temp = self.append_to_dict(filenames_temp, energy, filename)
+            timesteps_temp = self.append_to_dict(timesteps_temp, energy, timestep)
 
         # sort files in ascending order according to the timestep
         for energy in filenames_temp.keys():
@@ -106,17 +105,39 @@ class DataLoader:
                 else:
                     self.read_gpw_to_dict(atoms_dict, calc_dict, energy, filename)
 
-
         print(self.directory)
         print(json.dumps(self.all_gpw_files, indent=4))
-
         return atoms_dict, calc_dict
 
+    def append_to_dict(self, dictionary, key, value):
+        """
+        appends to a dictionary, where the value is a list of elements
 
+        Paramters:
+        dictionary (dict[str, __])
 
+        Returns:
+        dictionary (dict[str, __])
+        """
+
+        if key not in dictionary:
+            dictionary[key] = [value]
+        else:
+            dictionary[key].append(value)
+
+        return dictionary
 
     # can probably move the append_to_dict funtion to be a method of this class
     def read_gpw_to_dict(self, atoms_dict, calc_dict, energy, filename):
         atoms, calc = restart(self.directory + filename)
-        self.atoms_dict = utils.append_to_dict(atoms_dict, energy, atoms)
-        self.calc_dict = utils.append_to_dict(calc_dict, energy, calc)
+        self.atoms_dict = self.append_to_dict(atoms_dict, energy, atoms)
+        self.calc_dict = self.append_to_dict(calc_dict, energy, calc)
+
+
+
+    def save_electron_density_to_npy(self, trajectory_name, energy, electron_density_array):
+        np.save(f"{trajectory_name}_{energy}", electron_density_array)
+
+    def read_electron_density_from_npy(self, trajectory_name, energy):
+        return np.load(f"{trajectory_name}_{energy}.npy")
+
