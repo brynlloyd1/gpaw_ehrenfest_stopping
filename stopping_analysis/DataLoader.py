@@ -55,6 +55,11 @@ class DataLoader:
 
         # rename keys
         filename_dict = {f"{key} keV": value for key, value in filenames_temp.items()}
+
+        # sort the energies so that they are also in ascending order
+        sorted_items = sorted(filename_dict.items(), key=lambda item: int(item[0].split()[0]))
+        filename_dict = dict(sorted_items)
+
         return filename_dict
 
     def set_which_energies(self, which_energies):
@@ -134,10 +139,17 @@ class DataLoader:
         self.calc_dict = self.append_to_dict(calc_dict, energy, calc)
 
 
+    def check_for_npy(self, directory, energy):
+        trajectory_name = os.path.basename(directory.rstrip("/"))
+        npy_filename = f"{trajectory_name}_{energy}"
+        return npy_filename in os.listdir(directory)
 
-    def save_electron_density_to_npy(self, trajectory_name, energy, electron_density_array):
-        np.save(f"{trajectory_name}_{energy}", electron_density_array)
+    def load_from_npy(self, directory, energy):
+        trajectory_name = os.path.basename(directory.rstrip("/"))
+        npy_filename = f"{trajectory_name}_{energy}"
+        return np.load(directory+npy_filename)
 
-    def read_electron_density_from_npy(self, trajectory_name, energy):
-        return np.load(f"{trajectory_name}_{energy}.npy")
-
+    def save_to_npy(self, directory, energy, electron_density_list):
+        trajectory_name = os.path.basename(directory.rstrip("/"))
+        npy_filename = f"{trajectory_name}_{energy}"
+        np.save(f"{trajectory_name}_{energy}", np.array(electron_density_list))

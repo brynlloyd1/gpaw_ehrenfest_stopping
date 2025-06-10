@@ -5,3 +5,5 @@ stopping_analysis/*.txt
 data/*
 dft_data/*
 env/*
+*.npy
+.DS_Store
