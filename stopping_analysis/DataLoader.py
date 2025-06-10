@@ -134,22 +134,26 @@ class DataLoader:
 
     # can probably move the append_to_dict funtion to be a method of this class
     def read_gpw_to_dict(self, atoms_dict, calc_dict, energy, filename):
+        """uses gpaw.restart to load .gpw files. Writes data to dictionaries"""
         atoms, calc = restart(self.directory + filename)
         self.atoms_dict = self.append_to_dict(atoms_dict, energy, atoms)
         self.calc_dict = self.append_to_dict(calc_dict, energy, calc)
 
 
     def check_for_npy(self, directory, energy):
+        """checks if a .npy containing electron density data exists"""
         trajectory_name = os.path.basename(directory.rstrip("/"))
         npy_filename = f"{trajectory_name}_{energy}"
         return npy_filename in os.listdir(directory)
 
     def load_from_npy(self, directory, energy):
+        """loads .npy containing electron density data exists"""
         trajectory_name = os.path.basename(directory.rstrip("/"))
         npy_filename = f"{trajectory_name}_{energy}"
         return np.load(directory+npy_filename)
 
     def save_to_npy(self, directory, energy, electron_density_list):
+        """writes .npy containing electron density data exists"""
         trajectory_name = os.path.basename(directory.rstrip("/"))
         npy_filename = f"{trajectory_name}_{energy}"
         np.save(f"{trajectory_name}_{energy}", np.array(electron_density_list))

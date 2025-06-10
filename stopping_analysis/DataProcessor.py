@@ -1,6 +1,4 @@
-from ase.geometry import distance
 import numpy as np
-
 
 class Fit:
     """

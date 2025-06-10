@@ -111,6 +111,12 @@ class DataVisualiser:
                 axs[i,0].legend()
 
     def geant4_comparison(self, stopping_power_data):
+        """
+        plots comparison to Monte Carlo stopping curve
+
+        Parameters:
+        stopping_power_data (Dict[str, np.ndarray()])
+        """
         fig,ax = plt.subplots(figsize=(15,5))
         ax.set_xlabel("projectile initial kinetic energy [keV]")
         ax.set_ylabel(r"stopping power [eV/$\AA$]")
@@ -130,6 +136,7 @@ class DataVisualiser:
 
 
     def visualise_electron_density(self, electron_densities):
+        """uses matplotlib widget sliders to create interactive plot to visualise electron density"""
         max_t = np.shape(electron_densities)[0] - 1
         max_slice = np.shape(electron_densities)[2] - 1
 
