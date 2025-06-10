@@ -29,26 +29,15 @@ class EhrenfestAnalysis:
     def calculate_stopping_curve(self, trajectory_name, crop=[30, None]):
         handler = self.data_handlers[trajectory_name]
         processor = handler.data_processor
-        fits,covs = processor.calculate_stopping_powers(handler.atoms_dict, crop=crop)
-        handler.fits = fits
-        handler.covs = covs
+        fits_information = processor.calculate_stopping_powers(handler.atoms_dict, crop=crop)
+        handler.fits = fits_information
 
 
     def view_fits(self, trajectory_name):
         handler = self.data_handlers[trajectory_name]
         visualiser = handler.data_visualiser
+        visualiser.plot_all_fits(handler.atoms_dict, handler.fits)
 
-        # if DataProcessor.calculate_stopping_powers() has not been run for this trajectory
-        # then the function can still be used to view the kinetic energy data
-        # THIS DOESNT WORK ATM
-        if handler.fits:
-            params = [handler.atoms_dict,
-                     handler.fits,
-                     handler.covs]
-        else:
-            params = [handler.atoms_dict, None, None]
-
-        visualiser.plot_all_fits(*params)
 
     def compare_to_geant4(self, trajectory_names):
         stopping_power_data = {}
@@ -56,9 +45,10 @@ class EhrenfestAnalysis:
             handler = self.data_handlers[trajectory_name]
             energies = []
             stopping_powers = []
-            for energy, fit in handler.fits.items():
+
+            for energy, fit_info in handler.fits.items():
                 energies.append(int(energy.rstrip(" keV")))
-                stopping_powers.append(-fit[0]*1e3)   # fits[0] is in keV/Angstrom so conver to eV/Ang
+                stopping_powers.append(-fit_info.fit[0]*1e3)   # fits[0] is in keV/Angstrom so convert to eV/Ang
 
             stopping_power_data[trajectory_name] = {"energies": energies,
                                                     "stopping powers": stopping_powers}

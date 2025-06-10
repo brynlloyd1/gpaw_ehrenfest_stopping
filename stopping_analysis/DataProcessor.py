@@ -2,11 +2,16 @@ from ase.geometry import distance
 import numpy as np
 
 
-class FitInformation:
-    def __init__(self):
-        self.fit = None
-        self.cov = None
-        self.crop = [None, None]
+class Fit:
+    """
+    class that stored information about fits together
+    stored the fit, the covariance matrix,
+    and how the original data was cropped
+    """
+    def __init__(self, fit, cov, crop):
+        self.fit = fit
+        self.cov = cov
+        self.crop = crop
 
 
 
@@ -30,8 +35,7 @@ class DataProcessor:
                                                 for atoms in atoms_list]
                                         for energy, atoms_list in atoms_dict.items()}
 
-        fits = {}
-        covs = {}
+        fits_information = {}   # dictionary of energy : Fit
 
         for i in range(len(projectile_kinetic_energies.keys())):
             # get raw data
@@ -43,21 +47,19 @@ class DataProcessor:
             distance_travelled = np.array([np.linalg.norm(position - initial_position) for position in positions])
 
             distance_per_timestep = np.diff(distance_travelled)[0]
-            if crop[1] is not None:
-                if i == 0:  # print debug info only first time
-                    print(f"cropping {crop[1]} timesteps off the end = {crop[1] * distance_per_timestep} Angstroms")
-                distance_traveleld = distance_travelled[:crop[1]]
-                kinetic_energies = kinetic_energies[:crop[1]]
-            if crop[0] is not None:
-                if i == 0:
-                    print(f" cropping {crop[0]} timesteps off the start = {crop[0]*distance_per_timestep} Angstroms")
-                distance_travelled = distance_travelled[crop[0]:]
-                kinetic_energies = kinetic_energies[crop[0]:]
-            if i == 0:
-                print(f"number of remaining timesteps: {len(distance_travelled)} = {len(distance_travelled) * distance_per_timestep} Angstroms")
+            n_timesteps = len(distance_travelled)
+
+            distance_travelled = distance_travelled[crop[0]: n_timesteps - (crop[1] or 0)]
+            kinetic_energies = kinetic_energies[crop[0]: n_timesteps - (crop[1] or 0)]
+            # (None or 0) is 0, (int or 0) is int
+            print(f"""
+            For energy {energy}:
+            cropping {(crop[0] or 0)} timesteps off the start = {(crop[0] or 0) * distance_per_timestep} Angstroms
+            cropping {(crop[1] or 0)} timesteps off the end = {(crop[1] or 0) * distance_per_timestep} Angstroms
+            {len(distance_travelled)} timesteps remaining = {len(distance_travelled) * distance_per_timestep:.1f} Angstroms""")
 
             fit, cov = np.polyfit(distance_travelled, kinetic_energies, 1, cov=True)
-            fits[energy] = fit
-            covs[energy] = cov
-        return fits, covs
+            fit_info = Fit(fit, cov, crop)
+            fits_information[energy] = fit_info
 
+        return fits_information

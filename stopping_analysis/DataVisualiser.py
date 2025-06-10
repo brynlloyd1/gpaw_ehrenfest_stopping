@@ -14,7 +14,7 @@ class DataVisualiser:
     # FOR PLOTTING STOPPING POWER ANALYSIS #
     ########################################
 
-    def plot_all_fits(self, atoms_dict, fits, covs):
+    def plot_all_fits(self, atoms_dict, fits):
         """
         for every projectile energy, creates 2 subplots
         1. projectile kinetic energy against distance travelled
@@ -40,7 +40,6 @@ class DataVisualiser:
         fig,axs = plt.subplots(n_subplots, 2, figsize=(15, 5*n_subplots), sharex="col")
         if n_subplots == 1:
             axs = np.array([axs])
-
         fig.suptitle("Stopping Power Things")
         _ = [ax.set_ylabel("Kinetic Energy [keV]") for ax in axs[:,0]]
         _ = [ax.set_ylabel(r"$\frac{dKE}{dx}$ [keV/$\AA$]") for ax in axs[:,1]]
@@ -67,31 +66,48 @@ class DataVisualiser:
             # plot gradient of kinetic energy on right plot
             axs[i, 1].plot(distance_travelled[:-1], -np.diff(kinetic_energies)/np.diff(distance_travelled))
 
+
+
+            ######################
+            # PLOT GEANT4 DATA?? #
+            ######################
             plot_geant4_stopping = True
             if plot_geant4_stopping:
                 try:
                     index = np.where(self.geant4_stopping_data["energies"] == int(energy.rstrip(" keV")))[0]
                     pfit = np.poly1d([-1e-3*self.geant4_stopping_data["stopping powers"][index][0], self.geant4_stopping_data["energies"][index][0]])
-                    axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label="Geant4 prediction")
+                    axs[i, 0].plot(distance_travelled, pfit(distance_travelled), label=rf"Geant4: $S_e$ = {self.geant4_stopping_data['stopping powers'][index][0]:.1f} [eV/$\AA$]")
                 except:
                     print("no geant4 fit for one of the energies")
 
+            ########################
+            # PLOT STOPPING FITS?? #
+            ########################
             if fits:
-                fit = fits[energy]
+                # extract fit information from dictionary of Fit objects
+                fit = fits[energy].fit
                 pfit = np.poly1d(fit)
-                cov = covs[energy]
+                cov = fits[energy].cov
+                crop = fits[energy].crop
+
+                # calculate stopping powers from fits to display on the plots
                 stopping_power = -fit[0]
                 stopping_power_uncertainty = np.sqrt(cov[0][0])
                 label = rf"$S_e$ = {(1e3*stopping_power):.1f} $\pm$ {(1e3*stopping_power_uncertainty):.1f} [eV/$\AA$]"
+
+
+                # plot fits and uncertainties
                 axs[i, 0].plot(distance_travelled, pfit(distance_travelled), color="red", label=label)
 
-
-                # axs[i, 1].plot(positions[:-1], np.diff(pfit(positions)), color="red")
                 axs[i, 1].plot([distance_travelled[0], distance_travelled[-1]], [-fit[0], -fit[0]], color="red")
                 axs[i, 1].fill_between(distance_travelled, np.ones(len(distance_travelled))*-fit[0] - stopping_power_uncertainty,
                                                         np.ones(len(distance_travelled))*-fit[0] + stopping_power_uncertainty,
                                                         color="red", alpha=0.25)
 
+                # plot points used in the fitting
+                n_timesteps = len(distance_travelled)
+                axs[i, 0].plot(distance_travelled[crop[0]:n_timesteps - (crop[1] or 0)], kinetic_energies[crop[0]:n_timesteps - (crop[1] or 0)], "x", color="red")
+                axs[i, 1].plot(distance_travelled[crop[0] : n_timesteps - (crop[1] or 0) - 1], -np.diff(kinetic_energies)[crop[0] : n_timesteps - (crop[1] or 0) - 1]/np.diff(distance_travelled)[crop[0] : n_timesteps - (crop[1] or 0) - 1], "x", color="red")
                 axs[i,0].legend()
 
     def geant4_comparison(self, stopping_power_data):
@@ -101,7 +117,7 @@ class DataVisualiser:
 
         ax.plot(self.geant4_stopping_data["energies"], self.geant4_stopping_data["stopping powers"], "-", label="GEANT4")
         for trajectory_name, trajectory in stopping_power_data.items():
-            ax.plot(trajectory["energies"], trajectory["stopping powers"], "-x", label="trajectory_name")
+            ax.plot(trajectory["energies"], trajectory["stopping powers"], "-x", label=trajectory_name)
         ax.legend()
         plt.show()
 

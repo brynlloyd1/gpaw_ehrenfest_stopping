@@ -15,6 +15,5 @@ class DataHandler:
         self.atoms_dict = {}
         self.calc_dict = {}
         self.fits = {}
-        self.covs = {}
 
 
