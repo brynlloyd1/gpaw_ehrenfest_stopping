@@ -42,4 +42,3 @@ calc = GPAW(mode = "fd",
 system.calc = calc
 system.get_potential_energy()
 system.calc.write(name + '.gpw', mode='all')
-system.calc.write(name + '.gpw', mode='all')

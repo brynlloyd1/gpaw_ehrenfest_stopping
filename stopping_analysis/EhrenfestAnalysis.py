@@ -64,7 +64,7 @@ class EhrenfestAnalysis:
 
             for energy, fit_info in handler.fits.items():
                 energies.append(int(energy.rstrip(" keV")))
-                stopping_powers.append(-fit_info.fit[0]*1e3)   # fits[0] is in keV/Angstrom so convert to eV/Ang
+                stopping_powers.append(-fit_info.fit[0]*1e3)   # fit[0] is in keV/Angstrom. convert to eV/Ang
 
             stopping_power_data[trajectory_name] = {"energies": energies,
                                                     "stopping powers": stopping_powers}
