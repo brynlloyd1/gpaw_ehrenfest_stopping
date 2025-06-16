@@ -5,6 +5,7 @@ from ase.parallel import parprint
 import numpy as np
 
 import time
+from datetime import timedelta
 
 
 class EhrenfestStoppingSimulation:
@@ -19,7 +20,7 @@ class EhrenfestStoppingSimulation:
         self.name = name
         self.ground_state_name = name + "_ground_state.gpw"
         self.trajectory = trajectory
-        self.kinetic_energies = kinetic_energies
+        self.kinetic_energies = kinetic_energies / Hartree
 
         self.td_calc = None
 
@@ -39,7 +40,6 @@ class EhrenfestStoppingSimulation:
         projectile_index = len(self.td_calc.atoms.positions) - 1
         initial_velocities = np.zeros_like(self.td_calc.atoms.get_velocities())
         projectile_mass = self.td_calc.atoms.get_masses()[projectile_index] * (_amu / _me)
-        kinetic_energy *= 1 / Hartree
         speed = np.sqrt((2 * kinetic_energy) / projectile_mass) * Bohr / AUT
         initial_velocities[projectile_index] = (speed * np.array(self.trajectory.direction)).tolist()
 
@@ -69,11 +69,14 @@ class EhrenfestStoppingSimulation:
                 self.td_calc.write(f"{self.name}_{str(round(kinetic_energy*1e-3))}k_step{str(i)}.gpw")
             start_time = time.time()
             evv.propagate(timestep)
-            parprint(f"    completed timestep: {i+1} / {niters} in {time.time() - start_time}")
+            end_time = time.time()
+            formatted_time = str(timedelta(seconds = int(end_time - start_time)))
+
+            parprint(f"    completed timestep: {i+1}/{niters} in {formatted_time}")
 
     def run_simulation(self):
         for i, kinetic_energy in enumerate(self.kinetic_energies):
-            parprint(f"Running Simulation {i+1} / {len(self.kinetic_energies)}: {kinetic_energy}keV")
+            parprint(f"Running Simulation {i+1}/{len(self.kinetic_energies)}: {kinetic_energy}keV")
             self.initialise_calculation(kinetic_energy)
             self.run_ehrenfest(kinetic_energy)
 
